@@ -52,6 +52,7 @@ public class EventProcessor {
         OrderStatus oldStatus = order.status;
         if (oldStatus != newStatus) {
             order.status = newStatus;
+            orderStore.put(order.orderId, order);
             notifyStatusChanged(order, oldStatus, newStatus);
         }
     }
@@ -70,6 +71,7 @@ public class EventProcessor {
                 event.customerId,
                 event.items,
                 event.totalAmount,
+                0,
                 OrderStatus.CREATED,
                 List.of(event) // Initialize event history with the created event
         );
@@ -85,17 +87,19 @@ public class EventProcessor {
             log.error("No order found for orderId: {}", event.orderId);
             return;
         }
-        if(event.amountPaid >= order.totalAmount) {
+        order.paidAmount += event.amountPaid;
+        if (order.paidAmount >= order.totalAmount) {
             updateStatus(order, OrderStatus.PAID);
             log.info("Payment received for order: {}", order.orderId);
-        } else if(event.amountPaid > 0){
+        } else if(order.paidAmount > 0){
             updateStatus(order, OrderStatus.PARTIALLY_PAID);
             log.warn("Payment amount {} is less than total amount {} for order: {}",
                     event.amountPaid, order.totalAmount, order.orderId);
         } else {
-            log.error("Payment amount is zero or negative for order: {}", order.orderId);
+            log.error("Invalid payment amount for order: {}", order.orderId);
             return;
         }
+        orderStore.put(event.orderId, order);
         order.addEvent(event);
         log.info("Payment processed for order: {}", order.orderId);
     }
@@ -106,6 +110,7 @@ public class EventProcessor {
         if (order == null || order.status != OrderStatus.PAID) return;
         updateStatus(order, OrderStatus.SHIPPED);
         order.addEvent(event);
+        orderStore.put(event.orderId, order);
         log.info("📦 Order " + order.orderId + " shipped on " + event.shippingDate);
     }
 
@@ -115,8 +120,9 @@ public class EventProcessor {
         if (order == null)
             return;
         updateStatus(order, OrderStatus.CANCELLED);
-        log.info("Order {} has been cancelled", order.orderId);
         order.addEvent(event);
+        orderStore.put(event.orderId, order);
+        log.info("Order {} has been cancelled", order.orderId);
     }
     
     private void notifyEventProcessed(Event event, Order order) {

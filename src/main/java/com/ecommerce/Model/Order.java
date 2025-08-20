@@ -9,6 +9,7 @@ public class Order {
     public String customerId;
     public List<Item> items;
     public double totalAmount;
+    public double paidAmount;
     public OrderStatus status;
     public List<Event> eventHistory;
 
