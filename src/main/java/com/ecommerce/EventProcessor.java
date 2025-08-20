@@ -1,5 +1,6 @@
 package com.ecommerce;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +19,11 @@ import lombok.extern.slf4j.Slf4j;
 public class EventProcessor {
 
     private final Map<String, Order> orderStore = new HashMap<>();
+    private final List<OrderObserver> observers = new ArrayList<>();
+
+    public void addObserver(OrderObserver observer) {
+        observers.add(observer);
+    }
 
     public void processEvent(Event event) {
         if (event instanceof OrderCreatedEvent) {
@@ -31,6 +37,30 @@ public class EventProcessor {
         } else {
             log.error("⚠️ Unknown event type: {}", event.eventType);
         }
+
+        // Notify observers after processing
+        Order order = (event instanceof OrderCreatedEvent)
+                ? orderStore.get(((OrderCreatedEvent) event).orderId)
+                : orderStore.get(getOrderIdFromEvent(event));
+
+        if (order != null) {
+            notifyEventProcessed(event, order);
+        }
+    }
+
+    private void updateStatus(Order order, OrderStatus newStatus) {
+        OrderStatus oldStatus = order.status;
+        if (oldStatus != newStatus) {
+            order.status = newStatus;
+            notifyStatusChanged(order, oldStatus, newStatus);
+        }
+    }
+
+    private String getOrderIdFromEvent(Event e) {
+        if (e instanceof PaymentReceivedEvent) return ((PaymentReceivedEvent) e).orderId;
+        if (e instanceof ShippingScheduledEvent) return ((ShippingScheduledEvent) e).orderId;
+        if (e instanceof OrderCancelledEvent) return ((OrderCancelledEvent) e).orderId;
+        return null;
     }
 
     private void handleOrderCreated(OrderCreatedEvent event) {
@@ -56,11 +86,10 @@ public class EventProcessor {
             return;
         }
         if(event.amountPaid >= order.totalAmount) {
-            order.status = OrderStatus.PAID;
-            order.addEvent(event);
+            updateStatus(order, OrderStatus.PAID);
             log.info("Payment received for order: {}", order.orderId);
         } else if(event.amountPaid > 0){
-            order.status = OrderStatus.PARTIALLY_PAID;
+            updateStatus(order, OrderStatus.PARTIALLY_PAID);
             log.warn("Payment amount {} is less than total amount {} for order: {}",
                     event.amountPaid, order.totalAmount, order.orderId);
         } else {
@@ -68,7 +97,6 @@ public class EventProcessor {
             return;
         }
         order.addEvent(event);
-        log.info("Order status updated to: {}", order.status);
         log.info("Payment processed for order: {}", order.orderId);
     }
 
@@ -76,7 +104,7 @@ public class EventProcessor {
         // Logic to handle shipping scheduled event
         Order order = orderStore.get(event.orderId);
         if (order == null || order.status != OrderStatus.PAID) return;
-        order.status = OrderStatus.SHIPPED;
+        updateStatus(order, OrderStatus.SHIPPED);
         order.addEvent(event);
         log.info("📦 Order " + order.orderId + " shipped on " + event.shippingDate);
     }
@@ -84,9 +112,22 @@ public class EventProcessor {
     private void handleOrderCancelled(OrderCancelledEvent event) {
         // Logic to handle order cancelled event
         Order order = orderStore.get(event.orderId);
-        if(order == null) return;
-        order.status = OrderStatus.CANCELLED;
+        if (order == null)
+            return;
+        updateStatus(order, OrderStatus.CANCELLED);
         log.info("Order {} has been cancelled", order.orderId);
         order.addEvent(event);
+    }
+    
+    private void notifyEventProcessed(Event event, Order order) {
+        for (OrderObserver obs : observers) {
+            obs.onEventProcessed(event, order);
+        }
+    }
+
+    private void notifyStatusChanged(Order order, OrderStatus oldStatus, OrderStatus newStatus) {
+        for (OrderObserver obs : observers) {
+            obs.onStatusChanged(order, oldStatus, newStatus);
+        }
     }
 }
