@@ -40,7 +40,7 @@ public class EventReader {
             }
         }
         
-        log.info("📦 Total events parsed successfully: {}", events.size());
+        log.info("Total events parsed successfully: {}", events.size());
         return events;
     }
 }

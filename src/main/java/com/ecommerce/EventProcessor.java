@@ -35,7 +35,7 @@ public class EventProcessor {
         } else if (event instanceof OrderCancelledEvent) {
             handleOrderCancelled((OrderCancelledEvent) event);
         } else {
-            log.error("⚠️ Unknown event type: {}", event.eventType);
+            log.error("Unknown event type: {}", event.eventType);
         }
 
         // Notify observers after processing
@@ -117,7 +117,7 @@ public class EventProcessor {
         updateStatus(order, OrderStatus.SHIPPED);
         order.addEvent(event);
         orderStore.put(event.getOrderId(), order);
-        log.info("📦 Order " + order.getOrderId() + " shipped on " + event.getShippingDate());
+        log.info("Order " + order.getOrderId() + " shipped on " + event.getShippingDate());
     }
 
     private void handleOrderCancelled(OrderCancelledEvent event) {

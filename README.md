@@ -3,7 +3,7 @@
 ## Events
 
 1. Order creation
-2. Payment receipt
+2. Payment received
 3. Shipping scheduling
 4. Order cancellation
 
