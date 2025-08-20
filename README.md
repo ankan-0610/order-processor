@@ -10,6 +10,6 @@
 ## Requirements
 
 1. Domain Model Classes
-2. Event Ingestion from JSON files into Objects
+2. Event Ingestion from Text files with JSON into Objects
 3. Event Processing - Update Object State
 4. Notification/observer system
