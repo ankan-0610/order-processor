@@ -51,7 +51,7 @@ public class EventProcessor {
     private void updateStatus(Order order, OrderStatus newStatus) {
         OrderStatus oldStatus = order.status;
         if (oldStatus != newStatus) {
-            order.status = newStatus;
+            order.setStatus(newStatus);
             orderStore.put(order.orderId, order);
             notifyStatusChanged(order, oldStatus, newStatus);
         }
@@ -67,39 +67,45 @@ public class EventProcessor {
     private void handleOrderCreated(OrderCreatedEvent event) {
         // Logic to handle order created event
         Order order = new Order(
-                event.orderId,
-                event.customerId,
-                event.items,
-                event.totalAmount,
+                event.getOrderId(),
+                event.getCustomerId(),
+                event.getItems(),
+                event.getTotalAmount(),
                 0,
                 OrderStatus.CREATED,
-                List.of(event) // Initialize event history with the created event
+                new ArrayList<>()
         );
         order.addEvent(event);
-        orderStore.put(event.orderId, order);
+        orderStore.put(event.getOrderId(), order);
         log.info("Order created: {}", order.orderId);
     }
     
     private void handlePaymentReceived(PaymentReceivedEvent event) {
         // Logic to handle payment received event
         Order order = orderStore.get(event.orderId);
-        if (order == null || order.status != OrderStatus.CREATED) {
+        if (order == null) {
             log.error("No order found for orderId: {}", event.orderId);
             return;
         }
-        order.paidAmount += event.amountPaid;
-        if (order.paidAmount >= order.totalAmount) {
-            updateStatus(order, OrderStatus.PAID);
-            log.info("Payment received for order: {}", order.orderId);
-        } else if(order.paidAmount > 0){
-            updateStatus(order, OrderStatus.PARTIALLY_PAID);
-            log.warn("Payment amount {} is less than total amount {} for order: {}",
-                    event.amountPaid, order.totalAmount, order.orderId);
-        } else {
-            log.error("Invalid payment amount for order: {}", order.orderId);
+        if (order.getStatus() != OrderStatus.CREATED &&
+        order.getStatus() != OrderStatus.PARTIALLY_PAID) {
+            log.error("Payment received for order {} in status {}. Expected CREATED or PARTIALLY_PAID.",
+                    order.getOrderId(), order.getStatus());
             return;
         }
-        orderStore.put(event.orderId, order);
+        order.setPaidAmount(order.getPaidAmount()+event.getAmountPaid());
+        if (order.getPaidAmount() >= order.getTotalAmount()) {
+            updateStatus(order, OrderStatus.PAID);
+            log.info("Payment received for order: {}", order.getOrderId());
+        } else if(order.getPaidAmount() > 0){
+            updateStatus(order, OrderStatus.PARTIALLY_PAID);
+            log.warn("Payment amount {} is less than total amount {} for order: {}",
+                    event.getAmountPaid(), order.getTotalAmount(), order.getOrderId());
+        } else {
+            log.error("Invalid payment amount for order: {}", order.getOrderId());
+            return;
+        }
+        orderStore.put(event.getOrderId(), order);
         order.addEvent(event);
         log.info("Payment processed for order: {}", order.orderId);
     }
@@ -107,22 +113,22 @@ public class EventProcessor {
     private void handleShippingScheduled(ShippingScheduledEvent event) {
         // Logic to handle shipping scheduled event
         Order order = orderStore.get(event.orderId);
-        if (order == null || order.status != OrderStatus.PAID) return;
+        if (order == null || order.getStatus() != OrderStatus.PAID) return;
         updateStatus(order, OrderStatus.SHIPPED);
         order.addEvent(event);
-        orderStore.put(event.orderId, order);
-        log.info("📦 Order " + order.orderId + " shipped on " + event.shippingDate);
+        orderStore.put(event.getOrderId(), order);
+        log.info("📦 Order " + order.getOrderId() + " shipped on " + event.getShippingDate());
     }
 
     private void handleOrderCancelled(OrderCancelledEvent event) {
         // Logic to handle order cancelled event
-        Order order = orderStore.get(event.orderId);
+        Order order = orderStore.get(event.getOrderId());
         if (order == null)
             return;
         updateStatus(order, OrderStatus.CANCELLED);
         order.addEvent(event);
-        orderStore.put(event.orderId, order);
-        log.info("Order {} has been cancelled", order.orderId);
+        orderStore.put(event.getOrderId(), order);
+        log.info("Order {} has been cancelled", order.getOrderId());
     }
     
     private void notifyEventProcessed(Event event, Order order) {

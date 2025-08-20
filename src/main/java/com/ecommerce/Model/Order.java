@@ -2,8 +2,12 @@ package com.ecommerce.Model;
 
 import java.util.List;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 
 @AllArgsConstructor
+@Getter
+@Setter
 public class Order {
     public String orderId;
     public String customerId;

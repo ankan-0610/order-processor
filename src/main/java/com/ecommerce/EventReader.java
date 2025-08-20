@@ -10,6 +10,9 @@ import com.ecommerce.Model.Event;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 public class EventReader {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -18,15 +21,26 @@ public class EventReader {
         try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
             String line;
             while ((line = reader.readLine()) != null) {
+                line = line.trim();
+
+                if (line.isEmpty()) {
+                    log.warn("Skipping empty line in event file");
+                    continue; // skip blank lines
+                }
+
                 try {
                     Event event = objectMapper.readValue(line, Event.class);
                     events.add(event);
+                    log.info("Successfully parsed event: {}", event);
+                    log.info("Event Type: {}", event.eventType);
                 } catch (JsonProcessingException e) {
-                    System.err.println("⚠️ Failed to parse event: " + line);
+                    log.error("Failed to parse event: " + line);
+                    log.error("Error: " + e);
                 }
             }
         }
         
+        log.info("📦 Total events parsed successfully: {}", events.size());
         return events;
     }
 }

@@ -4,8 +4,10 @@
 # Log file
 *.log
 
+# manually written
 .vscode
 target
+dependency-reduced-pom.xml
 
 # BlueJ files
 *.ctxt
